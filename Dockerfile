@@ -1,6 +1,7 @@
 # This Dockerfile is used to build an headles vnc image based on Ubuntu
 
-FROM ubuntu:latest
+#FROM ubuntu:latest
+FROM x11docker/xfce:latest
 
 MAINTAINER Cute Google "admin@google.com"
 ENV REFRESHED_AT 2023-02-14-12:20
@@ -35,28 +36,7 @@ ENV HOME=/headless \
     LANGUAGE='en_US:en' \
     LC_ALL='en_US.UTF-8'
 
-#------------- edit ------------------
 
-RUN dpkg --add-architecture i386 && \
-    apt-get update && apt-get -y install python3 python-is-python3 python3-pip python3-numpy software-properties-common tzdata apt-utils sudo x11vnc xvfb fluxbox xdotool wget tar curl supervisor net-tools gnupg2
-
-RUN wget -O - https://dl.winehq.org/wine-builds/winehq.key | apt-key add -  && \
-    echo 'deb https://dl.winehq.org/wine-builds/ubuntu/ focal main' |tee /etc/apt/sources.list.d/winehq.list
-    
-RUN apt-get update && apt-get -y install winehq-stable
-
-# Install and unpack Wine-mono as shared install
-RUN mkdir -p /usr/share/wine/mono && wget -O /usr/share/wine/mono/wine-mono-7.4.0-x86.tar.xz https://dl.winehq.org/wine/wine-mono/7.4.0/wine-mono-7.4.0-x86.tar.xz
-RUN cd /usr/share/wine/mono/ && tar -xJf wine-mono-7.4.0-x86.tar.xz
-
-# Install and unpack Wine-gecko (for html .net component) as shared install
-RUN mkdir -p /usr/share/wine/gecko && wget -O /usr/share/wine/gecko/wine-gecko-2.47.3-x86.tar.xz https://dl.winehq.org/wine/wine-gecko/2.47.3/wine-gecko-2.47.3-x86.tar.xz
-RUN cd /usr/share/wine/gecko && tar xJf wine-gecko-2.47.3-x86.tar.xz
-
-# Install winetrick
-RUN mkdir -p /usr/bin && wget -O /usr/bin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks
-
-#------------- edit -----------------
 WORKDIR $HOME
 
 RUN apt-get update
@@ -64,78 +44,113 @@ RUN apt-get update
 RUN apt-get install -y apt-utils locales language-pack-en language-pack-en-base ; update-locale 
 
 RUN apt-get install -y \    
-    geany geany-plugins-common \
-    imagemagick \
-    libreoffice \
     libnss-wrapper \
-    ttf-wqy-zenhei \
     gettext \
-    pinta \
     xfce4 \
     xfce4-terminal \
-    xterm \
-    evince \
-    ansible \
-    git \
-    zip \
-    unzip \
-    iputils-ping \
-    build-essential \
-    openssh-client \
-    openssl \
-    dnsutils \
-    screen \
-    smbclient \
-    rsync \
-    whois \
-    netcat \
-    nmap \
-    terminator \
-    tmux \
-    vim \
-    vlc \
-    locales \
-    bzip2 \
-    xdotool \
-    xautomation
+    xterm 
 
-RUN wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg && \
-    install -o root -g root -m 644 packages.microsoft.gpg /etc/apt/trusted.gpg.d/ && \
-    echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/trusted.gpg.d/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list && \
-    rm -f packages.microsoft.gpg && \
-    apt-get -y install apt-transport-https && \
-    apt-get update && \
-    apt-get -y install code
 
-#----------------------------------
-# We install firefox, directly from Mozilla (not from snap)
-RUN     \
-        echo "Install Firefox from Mozilla" >&2               \
-        && apt-get update                                     \
-        && add-apt-repository ppa:mozillateam/ppa             \
-        && printf '\nPackage: *\nPin: release o=LP-PPA-mozillateam\nPin-Priority: 1001\n' > /etc/apt/preferences.d/mozilla-firefox                     \
-        && printf 'Unattended-Upgrade::Allowed-Origins:: "LP-PPA-mozillateam:${distro_codename}";' > /etc/apt/apt.conf.d/51unattended-upgrades-firefox \
-        && apt-get update                                     \
-        && apt-get install -y firefox --no-install-recommends \
-        && apt-get clean                                      \
-        && apt-get autoremove -y                              \
-        && rm -rf /tmp/* /var/tmp/*                           \
-        && rm -rf /var/lib/apt/lists/* /var/cache/apt/*       \
-        && echo "Install Firefox from Mozilla OK" >&2
-#Brave - source
-RUN \
-    echo "Install Firefox from Mozilla" >&2 \
-    && curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg && \
-    echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg arch=amd64] https://brave-browser-apt-release.s3.brave.com/ stable main"|tee /etc/apt/sources.list.d/brave-browser-release.list && \
-#PeaZip - source
-    wget https://github.com/peazip/PeaZip/releases/download/8.2.0/peazip_8.2.0.LINUX.GTK2-1_amd64.deb -P /tmp && \
-#Sublime - source
-    curl -fsSL https://download.sublimetext.com/sublimehq-pub.gpg | apt-key add - && \
-    add-apt-repository "deb https://download.sublimetext.com/ apt/stable/" && \
-#Installation
+#oooooooooooooooooooooooooooooooooooooooooooooo
+
+
+# cleanapt script for use after apt-get
+RUN echo '#! /bin/sh\n\
+env DEBIAN_FRONTEND=noninteractive apt-get autoremove -y\n\
+apt-get clean\n\
+find /var/lib/apt/lists -type f -delete\n\
+find /var/cache -type f -delete\n\
+find /var/log -type f -delete\n\
+exit 0\n\
+' > /cleanapt && chmod +x /cleanapt
+
+RUN . /etc/os-release && \
+    echo "deb http://deb.debian.org/debian $VERSION_CODENAME contrib non-free" >> /etc/apt/sources.list && \
+    env DEBIAN_FRONTEND=noninteractive dpkg --add-architecture i386 && \
     apt-get update && \
-    apt-get install --no-install-recommends brave-browser /tmp/peazip_8.2.0.LINUX.GTK2-1_amd64.deb sublime-text -y \
-    && echo "Install Firefox from Mozilla OK" >&2
+    env DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        fonts-wine \
+        locales \
+        ttf-mscorefonts-installer \
+        wget \
+        winbind \
+        wine \
+        winetricks && \
+    /cleanapt
+
+RUN mkdir -p /usr/share/wine/gecko && \
+    cd /usr/share/wine/gecko && \
+    wget https://dl.winehq.org/wine/wine-gecko/2.47/wine_gecko-2.47-x86.msi && \
+    wget https://dl.winehq.org/wine/wine-gecko/2.47/wine_gecko-2.47-x86_64.msi
+
+RUN mkdir -p /usr/share/wine/mono && \
+    cd /usr/share/wine/mono && \
+    wget https://dl.winehq.org/wine/wine-mono/4.9.4/wine-mono-4.9.4.msi
+
+RUN apt-get update && \
+    env DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        gettext \
+        gnome-icon-theme \
+        playonlinux \
+        q4wine \
+        xterm && \
+    /cleanapt
+
+RUN apt-get update && \
+    env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        libpulse0 \
+        libxv1 \
+        mesa-utils \
+        mesa-utils-extra \
+        pasystray \
+        pavucontrol && \
+    /cleanapt
+
+RUN apt-get update && \
+    env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        xfwm4 && \
+    /cleanapt && \
+    mkdir -p /etc/skel/.config/lxsession/LXDE && \
+    echo '[Session]\n\
+window_manager=xfwm4\n\
+' >/etc/skel/.config/lxsession/LXDE/desktop.conf
+
+# Enable this for chinese, japanese and korean fonts in wine
+#RUN winetricks -q cjkfonts
+
+# create desktop icons
+#
+RUN mkdir -p /etc/skel/Desktop && \
+echo '#! /bin/bash \n\
+datei="/etc/skel/Desktop/$(echo "$1" | LC_ALL=C sed -e "s/[^a-zA-Z0-9,.-]/_/g" ).desktop" \n\
+echo "[Desktop Entry]\n\
+Version=1.0\n\
+Type=Application\n\
+Name=$1\n\
+Exec=$2\n\
+Icon=$3\n\
+" > $datei \n\
+chmod +x $datei \n\
+' >/usr/local/bin/createicon && chmod +x /usr/local/bin/createicon && \
+\
+createicon "PlayOnLinux"        "playonlinux"       playonlinux && \
+createicon "Q4wine"             "q4wine"            q4wine && \
+createicon "Internet Explorer"  "wine iexplore"     applications-internet && \
+createicon "Console"            "wineconsole"       utilities-terminal && \
+createicon "File Explorer"      "wine explorer"     folder && \
+createicon "Notepad"            "wine notepad"      wine-notepad && \
+createicon "Wordpad"            "wine wordpad"      accessories-text-editor && \
+createicon "winecfg"            "winecfg"           wine-winecfg && \
+createicon "WineFile"           "winefile"          folder-wine && \
+createicon "Mines"              "wine winemine"     face-cool && \
+createicon "winetricks"         "winetricks -gui"   wine && \
+createicon "Registry Editor"    "regedit"           preferences-system && \
+createicon "UnInstaller"        "wine uninstaller"  wine-uninstaller && \
+createicon "Taskmanager"        "wine taskmgr"      utilities-system-monitor && \
+createicon "Control Panel"      "wine control"      preferences-system && \
+createicon "OleView"            "wine oleview"      preferences-system && \
+createicon "CJK fonts installer chinese japanese korean"  "xterm -e \"winetricks cjkfonts\""  font
+
 #------------------------------------------------------------
 
 ### noVNC needs python2 and ubuntu docker image is not providing any default python
