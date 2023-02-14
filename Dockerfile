@@ -1,7 +1,6 @@
 # This Dockerfile is used to build an headles vnc image based on Ubuntu
 
-#FROM ubuntu:latest
-FROM x11docker/xfce:latest
+FROM ubuntu:latest
 
 MAINTAINER Cute Google "admin@google.com"
 ENV REFRESHED_AT 2023-02-14-12:20
@@ -36,128 +35,50 @@ ENV HOME=/headless \
     LANGUAGE='en_US:en' \
     LC_ALL='en_US.UTF-8'
 
-
 WORKDIR $HOME
 
 RUN apt-get update
 
-RUN apt-get install -y apt-utils locales language-pack-en language-pack-en-base ; update-locale 
+RUN apt-get install -y python3 python-is-python3 python3-pip software-properties-common tzdata sudo x11vnc xvfb xdotool wget tar curl supervisor net-tools apt-utils locales language-pack-en language-pack-en-base ; update-locale 
 
-RUN apt-get install -y \    
-    libnss-wrapper \
-    gettext \
+RUN apt-get install -y \
     xfce4 \
     xfce4-terminal \
-    xterm 
+    xterm \
+    iputils-ping \
+    build-essential \
+    openssh-client \
+    openssl \
+    dnsutils \
+    screen \
+    terminator \
+    tmux \
+    vim \
+    vlc \
+    locales \
+    xdotool \
+    xautomation
 
-
-#oooooooooooooooooooooooooooooooooooooooooooooo
-
-
-# cleanapt script for use after apt-get
-RUN echo '#! /bin/sh\n\
-env DEBIAN_FRONTEND=noninteractive apt-get autoremove -y\n\
-apt-get clean\n\
-find /var/lib/apt/lists -type f -delete\n\
-find /var/cache -type f -delete\n\
-find /var/log -type f -delete\n\
-exit 0\n\
-' > /cleanapt && chmod +x /cleanapt
-
-RUN . /etc/os-release && \
-    echo "deb http://deb.debian.org/debian $VERSION_CODENAME contrib non-free" >> /etc/apt/sources.list && \
-    env DEBIAN_FRONTEND=noninteractive dpkg --add-architecture i386 && \
-    apt-get update && \
-    env DEBIAN_FRONTEND=noninteractive apt-get install -y \
-        fonts-wine \
-        locales \
-        ttf-mscorefonts-installer \
-        wget \
-        winbind \
-        wine \
-        winetricks && \
-    /cleanapt
-
-RUN mkdir -p /usr/share/wine/gecko && \
-    cd /usr/share/wine/gecko && \
-    wget https://dl.winehq.org/wine/wine-gecko/2.47/wine_gecko-2.47-x86.msi && \
-    wget https://dl.winehq.org/wine/wine-gecko/2.47/wine_gecko-2.47-x86_64.msi
-
-RUN mkdir -p /usr/share/wine/mono && \
-    cd /usr/share/wine/mono && \
-    wget https://dl.winehq.org/wine/wine-mono/4.9.4/wine-mono-4.9.4.msi
-
-RUN apt-get update && \
-    env DEBIAN_FRONTEND=noninteractive apt-get install -y \
-        gettext \
-        gnome-icon-theme \
-        playonlinux \
-        q4wine \
-        xterm && \
-    /cleanapt
-
-RUN apt-get update && \
-    env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        libpulse0 \
-        libxv1 \
-        mesa-utils \
-        mesa-utils-extra \
-        pasystray \
-        pavucontrol && \
-    /cleanapt
-
-RUN apt-get update && \
-    env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        xfwm4 && \
-    /cleanapt && \
-    mkdir -p /etc/skel/.config/lxsession/LXDE && \
-    echo '[Session]\n\
-window_manager=xfwm4\n\
-' >/etc/skel/.config/lxsession/LXDE/desktop.conf
-
-# Enable this for chinese, japanese and korean fonts in wine
-#RUN winetricks -q cjkfonts
-
-# create desktop icons
-#
-RUN mkdir -p /etc/skel/Desktop && \
-echo '#! /bin/bash \n\
-datei="/etc/skel/Desktop/$(echo "$1" | LC_ALL=C sed -e "s/[^a-zA-Z0-9,.-]/_/g" ).desktop" \n\
-echo "[Desktop Entry]\n\
-Version=1.0\n\
-Type=Application\n\
-Name=$1\n\
-Exec=$2\n\
-Icon=$3\n\
-" > $datei \n\
-chmod +x $datei \n\
-' >/usr/local/bin/createicon && chmod +x /usr/local/bin/createicon && \
-\
-createicon "PlayOnLinux"        "playonlinux"       playonlinux && \
-createicon "Q4wine"             "q4wine"            q4wine && \
-createicon "Internet Explorer"  "wine iexplore"     applications-internet && \
-createicon "Console"            "wineconsole"       utilities-terminal && \
-createicon "File Explorer"      "wine explorer"     folder && \
-createicon "Notepad"            "wine notepad"      wine-notepad && \
-createicon "Wordpad"            "wine wordpad"      accessories-text-editor && \
-createicon "winecfg"            "winecfg"           wine-winecfg && \
-createicon "WineFile"           "winefile"          folder-wine && \
-createicon "Mines"              "wine winemine"     face-cool && \
-createicon "winetricks"         "winetricks -gui"   wine && \
-createicon "Registry Editor"    "regedit"           preferences-system && \
-createicon "UnInstaller"        "wine uninstaller"  wine-uninstaller && \
-createicon "Taskmanager"        "wine taskmgr"      utilities-system-monitor && \
-createicon "Control Panel"      "wine control"      preferences-system && \
-createicon "OleView"            "wine oleview"      preferences-system && \
-createicon "CJK fonts installer chinese japanese korean"  "xterm -e \"winetricks cjkfonts\""  font
+#----------------------------------
+# We install firefox, directly from Mozilla (not from snap)
+RUN     \
+        echo "Install Firefox from Mozilla" >&2               \
+        && apt-get update                                     \
+        && add-apt-repository ppa:mozillateam/ppa             \
+        && printf '\nPackage: *\nPin: release o=LP-PPA-mozillateam\nPin-Priority: 1001\n' > /etc/apt/preferences.d/mozilla-firefox                     \
+        && printf 'Unattended-Upgrade::Allowed-Origins:: "LP-PPA-mozillateam:${distro_codename}";' > /etc/apt/apt.conf.d/51unattended-upgrades-firefox \
+        && apt-get update                                     \
+        && apt-get install -y firefox --no-install-recommends \
+        && apt-get clean                                      \
+        && apt-get autoremove -y                              \
+        && rm -rf /tmp/* /var/tmp/*                           \
+        && rm -rf /var/lib/apt/lists/* /var/cache/apt/*       \
+        && echo "Install Firefox from Mozilla OK" >&2
 
 #------------------------------------------------------------
 
 ### noVNC needs python2 and ubuntu docker image is not providing any default python
 RUN test -e /usr/bin/python && rm -f /usr/bin/python ; ln -s /usr/bin/python3 /usr/bin/python
-
-RUN apt-get purge -y pm-utils xscreensaver* && \
-    apt-get -y clean
 
 ### Install xvnc-server & noVNC - HTML5 based VNC viewer
 RUN mkdir -p $NO_VNC_HOME/utils/websockify && \
